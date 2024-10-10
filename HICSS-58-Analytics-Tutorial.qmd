@@ -1,0 +1,604 @@
+---
+title: "HICSS 58 Tutorial: Advanced Text Analytics Through NLP, Generative AI, and Large Language Models"
+author: "Derrick Cogburn, Haiman Wong, Theodore Andrew Ocheing"
+date: today
+format: 
+  html:
+    self-contained: true
+  #pdf:
+   # titlepage: true
+    #toc: true
+    #toc-depth: 2
+    #code-block-wrap: true
+execute:
+  freeze: false
+  echo: false
+editor: source
+python: 
+  path: "/Users/derrickcogburn/miniconda3/envs/transformers/bin/python"
+---
+
+Exploratory Data Analysis
+
+Understanding the NIST RFI Data
+
+The United States National Institues of Standards and Technology (NIST) issued a Request for Information about the Cybersecurity Framework in 2021 and 2024. The data contains the text of the RFIs, as well as other information about the RFIs.
+
+NB: We will add more here to describe this data (where it comes from and why we want to look at it).
+
+# Install and Load Necessary Packages
+
+```{r}
+# Install necessary packages
+#install.packages("tidyverse")
+#install.packages("tidytext")
+#install.packages("ggplot2")
+#install.packages("wordcloud2")
+#install.packages("topicmodels")
+#install.packages("textdata")
+#install.packages("widyr")
+```
+
+
+```{r}
+# Load core packages
+library(tidyverse)
+library(tidytext)
+
+# For visualization
+library(ggplot2)
+library(wordcloud2)
+
+# For topic modeling
+library(topicmodels)
+
+# For sentiment analysis
+library(textdata)
+
+# For data manipulation
+library(widyr)
+```
+
+Export the Combined Dataset as a CSV File
+
+```{r}
+# Ensure readr is loaded
+library(readr)
+
+# Export rfis_combined to a CSV file
+write_csv(rfis_combined, "data/rfis_combined.csv")
+```
+
+
+# Loading and Combining the Datasets
+
+```{r}
+# Load the datasets
+rfis2021 <- read_csv("data/nist_2021_rfis.csv")
+rfis2024 <- read_csv("data/nist_2024_rfis.csv")
+
+# Add a year column to each dataset
+rfis2021 <- rfis2021 %>% mutate(year = 2021)
+rfis2024 <- rfis2024 %>% mutate(year = 2024)
+
+# Combine the two datasets
+rfis_combined <- bind_rows(rfis2021, rfis2024)
+
+# Preview the combined dataset
+glimpse(rfis_combined)
+```
+
+
+# Preprocessing the Text Data
+
+```{r}
+# Tokenize the text data
+tidy_rfis <- rfis_combined %>%
+  unnest_tokens(word, Text)
+
+# Remove stop words
+data("stop_words")
+tidy_rfis <- tidy_rfis %>%
+  anti_join(stop_words, by = "word")
+
+# Remove custom stop words (if any)
+#custom_stop_words <- tibble(word = c("cyber", "security", "information"))
+custom_stop_words <- tibble(word = c("http", "https"))
+tidy_rfis <- tidy_rfis %>%
+  anti_join(custom_stop_words, by = "word")
+
+# Remove numbers and punctuation
+tidy_rfis <- tidy_rfis %>%
+  filter(!str_detect(word, "^[0-9]+$")) %>%
+  mutate(word = str_remove_all(word, "[[:punct:]]"))
+```
+
+Further Pre-Processing: Stemming (Optional)
+
+```{r}
+# Stemming
+#library(SnowballC)
+#tidy_rfis <- tidy_rfis %>%
+ # mutate(word = wordStem(word, language = "en"))
+```
+
+# Exploratory Data Analysis
+
+Frequency Based Analysis
+
+```{r}
+# Calculate word counts
+word_counts <- tidy_rfis %>%
+  count(word, sort = TRUE)
+
+# View top 10 words
+head(word_counts, 10)
+```
+
+# Visualizing Word Frequencies
+
+```{r}
+# Bar plot of top 20 words
+word_counts %>%
+  top_n(20) %>%
+  ggplot(aes(x = reorder(word, n), y = n)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Top 20 Most Frequent Words",
+       x = "Words",
+       y = "Frequency")
+```
+
+# Exploring TF*IDF Analysis
+
+```{r}
+# Calculate TF-IDF
+tf_idf <- tidy_rfis %>%
+  count(year, word) %>%
+  bind_tf_idf(word, year, n) %>%
+  arrange(desc(tf_idf))
+
+# View top 10 TF-IDF words for each year
+tf_idf %>%
+  group_by(year) %>%
+  top_n(10, tf_idf) %>%
+  ungroup()
+```
+
+# Visualizing TF*IDF Analysis
+
+```{r}
+# Plot TF-IDF results
+tf_idf %>%
+  group_by(year) %>%
+  top_n(10, tf_idf) %>%
+  ungroup() %>%
+  ggplot(aes(x = reorder(word, tf_idf), y = tf_idf, fill = as.factor(year))) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  facet_wrap(~ year, scales = "free") +
+  labs(title = "Top TF-IDF Words by Year",
+       x = "Words",
+       y = "TF-IDF")
+```
+
+# N-gram Analysis
+
+```{r}
+# Create bigrams
+bigrams <- rfis_combined %>%
+  unnest_tokens(bigram, Text, token = "ngrams", n = 2)
+
+# Separate words in bigrams
+bigrams_separated <- bigrams %>%
+  separate(bigram, into = c("word1", "word2"), sep = " ")
+
+# Remove stop words
+bigrams_filtered <- bigrams_separated %>%
+  filter(!word1 %in% stop_words$word,
+         !word2 %in% stop_words$word)
+
+# Count bigrams
+bigram_counts <- bigrams_filtered %>%
+  count(word1, word2, sort = TRUE)
+
+# Unite bigrams for visualization
+bigram_counts <- bigram_counts %>%
+  unite(bigram, word1, word2, sep = " ")
+```
+
+# Visualizing Bigram Frequencies
+
+```{r}
+# Bar plot of top 20 bigrams
+bigram_counts %>%
+  top_n(20, n) %>%
+  ggplot(aes(x = reorder(bigram, n), y = n)) +
+  geom_col(fill = "darkgreen") +
+  coord_flip() +
+  labs(title = "Top 20 Bigrams",
+       x = "Bigrams",
+       y = "Frequency")
+```
+
+# Sub-Group Comparisions: Year-wise Analysis
+
+```{r}
+# Calculate word frequencies for each year
+word_year_counts <- tidy_rfis %>%
+  count(year, word) %>%
+  group_by(year) %>%
+  mutate(proportion = n / sum(n)) %>%
+  select(-n)
+
+# Spread data for comparison
+word_year_comparison <- word_year_counts %>%
+  spread(year, proportion) %>%
+  filter(!is.na(`2021`) & !is.na(`2024`))
+
+# Plot comparison
+ggplot(word_year_comparison, aes(x = `2021`, y = `2024`)) +
+  geom_abline(lty = 2, color = "gray") +
+  geom_jitter(alpha = 0.5, color = "purple") +
+  labs(title = "Word Usage Comparison: 2021 vs 2024",
+       x = "2021 Proportion",
+       y = "2024 Proportion") +
+  theme_minimal()
+```
+
+# Topic Modeling
+
+Creating a Document Term Matrix (DTM)
+
+```{r}
+# Create a document identifier
+rfis_combined <- rfis_combined %>%
+  mutate(doc_id = row_number())
+
+# Prepare data for DTM
+dtm_data <- rfis_combined %>%
+  unnest_tokens(word, Text) %>%
+  anti_join(stop_words, by = "word") %>%
+  count(doc_id, word)
+
+# Create DTM
+dtm <- dtm_data %>%
+  cast_dtm(doc_id, word, n)
+```
+
+Topic Modeling using LDA
+
+```{r}
+# Set number of topics
+num_topics <- 5
+
+# Run LDA
+lda_model <- LDA(dtm, k = num_topics, control = list(seed = 1234))
+
+# Extract topics
+topics <- tidy(lda_model, matrix = "beta")
+```
+
+Visualizing Topics
+
+```{r}
+# Get top terms
+top_terms <- topics %>%
+  group_by(topic) %>%
+  top_n(10, beta) %>%
+  ungroup() %>%
+  arrange(topic, -beta)
+
+# View top terms
+top_terms
+```
+
+Visualizing Topics
+
+```{r}
+# Plot top terms for each topic
+top_terms %>%
+  mutate(term = reorder_within(term, beta, topic)) %>%
+  ggplot(aes(term, beta, fill = as.factor(topic))) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free_y") +
+  coord_flip() +
+  scale_x_reordered() +
+  labs(title = "Top Terms in Each Topic",
+       x = "Terms",
+       y = "Beta")
+```
+
+# Sentiment Analysis
+
+```{r}
+# Load NRC sentiment lexicon
+nrc_lexicon <- get_sentiments("nrc")
+
+# Join with our data
+sentiments <- tidy_rfis %>%
+  inner_join(nrc_lexicon, by = "word")
+
+# Count sentiments
+sentiment_counts <- sentiments %>%
+  count(sentiment, sort = TRUE)
+
+# View sentiment counts
+sentiment_counts
+```
+
+Visualizing Sentiment Analysis
+
+```{r}
+# Plot sentiment distribution
+sentiment_counts %>%
+  ggplot(aes(x = reorder(sentiment, n), y = n, fill = sentiment)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  labs(title = "Sentiment Distribution",
+       x = "Sentiment",
+       y = "Count")
+```
+
+# Creating a Custom Cybersecurity Dictionary/Lexicon
+
+```{r}
+# Custom cybersecurity lexicon
+cyber_lexicon <- tribble(
+  ~word,       ~sentiment,
+  "ransomware", "negative",
+  "firewall",   "positive",
+  "breach",     "negative",
+  "patch",      "positive",
+  # Add more terms
+)
+
+# Join with our data
+cyber_sentiments <- tidy_rfis %>%
+  inner_join(cyber_lexicon, by = "word")
+
+# Count custom sentiments
+cyber_sentiment_counts <- cyber_sentiments %>%
+  count(sentiment, sort = TRUE)
+
+# View custom sentiment counts
+cyber_sentiment_counts
+```
+
+Visualizing Custom Sentiment Analysis
+
+```{r}
+# Plot custom sentiment distribution
+cyber_sentiment_counts %>%
+  ggplot(aes(x = sentiment, y = n, fill = sentiment)) +
+  geom_col(show.legend = FALSE) +
+  labs(title = "Custom Cybersecurity Sentiment Distribution",
+       x = "Sentiment",
+       y = "Count")
+```
+
+# Python Exploration
+
+```{python}
+import pandas as pd
+import numpy as np
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.decomposition import LatentDirichletAllocation
+import matplotlib.pyplot as plt
+import seaborn as sns
+```
+
+
+```{python}
+#| echo: false
+import pandas as pd
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.decomposition import LatentDirichletAllocation
+
+# Load data
+rfis_combined = pd.read_csv("data/rfis_combined.csv")
+
+# Check the type of rfis_combined
+print(type(rfis_combined))
+
+# Clean the 'Text' column
+
+# Remove rows with NaN in 'Text' column and reset index
+rfis_combined = rfis_combined.dropna(subset=['Text']).reset_index(drop=True)
+
+# Remove rows where 'Text' is empty or contains only whitespace
+rfis_combined = rfis_combined[rfis_combined['Text'].str.strip() != ''].reset_index(drop=True)
+
+# Ensure you're working with a copy to avoid the warning
+rfis_combined = rfis_combined.copy()
+
+# Convert 'Text' column to string type using .loc
+rfis_combined.loc[:, 'Text'] = rfis_combined['Text'].astype(str)
+
+# Text preprocessing
+# Implement tokenization, stop word removal, etc.
+
+# Vectorize text
+vectorizer = CountVectorizer(max_df=0.95, min_df=2, stop_words='english')
+dtm = vectorizer.fit_transform(rfis_combined['Text'])
+
+# LDA Model
+lda = LatentDirichletAllocation(n_components=5, random_state=1234)
+lda.fit(dtm)
+
+# Display topics
+for idx, topic in enumerate(lda.components_):
+    print("Topic %d:" % (idx))
+    print([vectorizer.get_feature_names_out()[i] for i in topic.argsort()[:-11:-1]])
+```
+
+# Now we will visualize the topics using Python
+
+```{python}
+# Number of top words to display
+n_top_words = 10
+
+# Get the feature names (vocabulary)
+feature_names = vectorizer.get_feature_names_out()
+
+# Initialize a list to hold the top words per topic
+top_words_per_topic = []
+
+for topic_idx, topic in enumerate(lda.components_):
+    top_indices = topic.argsort()[:-n_top_words - 1:-1]
+    top_words = [feature_names[i] for i in top_indices]
+    top_weights = topic[top_indices]
+    top_words_per_topic.append((topic_idx, top_words, top_weights))
+```
+ 
+Now prepare a Pandas DataFrame for plotting
+
+```{python}
+import pandas as pd
+
+# Prepare data for plotting
+topics_df = pd.DataFrame()
+
+for topic_idx, top_words, top_weights in top_words_per_topic:
+    df = pd.DataFrame({
+        'topic': f'Topic {topic_idx + 1}',
+        'word': top_words,
+        'weight': top_weights
+    })
+    topics_df = pd.concat([topics_df, df], ignore_index=True)
+```
+
+Now plot the top words for each topic
+
+```{python}
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# Set the figure size
+plt.figure(figsize=(12, 8))
+
+# Create a bar plot for each topic
+g = sns.catplot(
+    x='weight',
+    y='word',
+    hue='topic',
+    data=topics_df,
+    kind='bar',
+    height=6,
+    aspect=1.5,
+    palette='tab10',
+    legend=False
+)
+
+# Adjust the layout
+plt.tight_layout()
+plt.legend(title='Topics', loc='upper right')
+plt.title('Top Words per Topic')
+plt.xlabel('Word Weight')
+plt.ylabel('Word')
+plt.show()
+```
+
+#Now visualize with word clouds
+
+```{python}
+from wordcloud import WordCloud
+
+# Set up the number of topics
+num_topics = lda.n_components
+
+# Create a figure with subplots
+fig, axes = plt.subplots(1, num_topics, figsize=(15, 5), sharex=True, sharey=True)
+
+for idx, ax in enumerate(axes):
+    topic = lda.components_[idx]
+    top_indices = topic.argsort()[:-n_top_words - 1:-1]
+    top_words = {feature_names[i]: topic[i] for i in top_indices}
+    
+    # Generate a word cloud
+    wc = WordCloud(width=400, height=330, background_color='white')
+    wc.generate_from_frequencies(top_words)
+    
+    # Plot the word cloud
+    ax.imshow(wc, interpolation='bilinear')
+    ax.axis('off')
+    ax.set_title(f'Topic {idx + 1}')
+
+plt.tight_layout()
+plt.show()
+```
+
+# Visualize with a heat map
+
+```{python}
+import numpy as np
+
+# Create a DataFrame for heatmap
+topic_word_weights = lda.components_ / lda.components_.sum(axis=1)[:, np.newaxis]
+
+# Get the top words for all topics
+top_word_indices = np.argsort(-topic_word_weights, axis=1)[:, :n_top_words]
+top_words = feature_names[top_word_indices]
+
+# Prepare DataFrame
+heatmap_df = pd.DataFrame(topic_word_weights[:, top_word_indices[0]], columns=top_words[0])
+for i in range(1, num_topics):
+    df = pd.DataFrame(topic_word_weights[:, top_word_indices[i]], columns=top_words[i])
+    heatmap_df = pd.concat([heatmap_df, df], axis=1)
+
+heatmap_df.index = [f'Topic {i + 1}' for i in range(num_topics)]
+```
+
+Plot the heatmap
+
+```{python}
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# Set the figure size
+plt.figure(figsize=(12, 6))
+
+# Plot the heatmap
+sns.heatmap(heatmap_df, cmap='YlGnBu')
+
+# Adjust the layout
+plt.title('Heatmap of Topic-Word Weights')
+plt.xlabel('Words')
+plt.ylabel('Topics')
+plt.show()
+```
+
+The heatmap displays the weights of the top words across topics. Darker colors represent higher weights.
+
+Converting to a Gensim model
+
+```{python}
+import gensim
+from gensim.matutils import Sparse2Corpus
+from gensim.corpora import Dictionary
+
+# Convert dtm to gensim corpus
+corpus = Sparse2Corpus(dtm, documents_columns=False)
+
+# Create mapping from word IDs to words
+id2word = Dictionary()
+id2word.id2token = dict((v, k) for k, v in vectorizer.vocabulary_.items())
+id2word.token2id = vectorizer.vocabulary_
+
+# Train LDA model using gensim
+gensim_lda = gensim.models.LdaModel(corpus=corpus, num_topics=5, id2word=id2word, passes=10)
+```
+
+Visualize using the gensim model
+
+```{python}
+import pyLDAvis
+import pyLDAvis.gensim_models as gensimvis
+
+panel = gensimvis.prepare(gensim_lda, corpus, id2word, mds='tsne')
+
+# Save visualization
+pyLDAvis.save_html(panel, 'lda_visualization.html')
+```
+
+
