@@ -1,0 +1,22 @@
+---
+title: "HICSS Stream 1"
+format: html
+editor: visual
+---
+
+```{r Load Packages}
+### Check to make sure packages needed to work on Stream are included ###
+
+library(tidyverse)        # Also loads dplyr, ggplot2, and haven
+library(quanteda)         # For NLP
+library(tidytext)
+```
+
+
+# Part 1: Gathering and Cleaning Data
+```{r Import Data}
+NISTfiles <- read_csv("data/LATEST_categorized_nist_2021_rfis.csv")
+
+summary(NISTfiles)
+head(NISTfiles)
+```

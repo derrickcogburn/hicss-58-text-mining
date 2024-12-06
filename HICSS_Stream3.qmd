@@ -1,0 +1,48 @@
+---
+title: "HICSS Stream 3"
+format: html
+editor: visual
+---
+
+```{r Load Packages}
+### Check to make sure packages needed to work on Stream are included ###
+
+library(tidyverse)        # Also loads dplyr, ggplot2, and haven
+library(tidytext)
+library(tidymodels)
+library(textrecipes)
+```
+
+
+# Part 1: Gathering and Cleaning Data
+```{r Import Data}
+NISTfiles <- read_csv("data/LATEST_categorized_nist_2021_rfis.csv")
+
+summary(NISTfiles)
+head(NISTfiles)
+```
+
+
+```{r Check NAs}
+# Get metadata about NAs 
+NISTfiles %>% 
+  naniar::miss_var_summary() %>% 
+  mutate(pct_miss = round(pct_miss, 2))
+```
+
+
+```{r Records by Grouping}
+# ---- Category ----
+NISTfiles %>% 
+  count(Category, sort = T) %>% 
+  mutate(prop = round(n/sum(n), 4)) %>% 
+  tibble()
+
+# ---- Organization ----
+NISTfiles %>% 
+  count(Organization, sort = T) %>% 
+  mutate(prop = round(n/sum(n), 4)) %>% 
+  tibble()
+```
+
+
