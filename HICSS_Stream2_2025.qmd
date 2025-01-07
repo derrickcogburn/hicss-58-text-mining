@@ -1,0 +1,975 @@
+---
+title: "HICSS 2025 Tutorial on Advanced Text Analytics with NLP and GenAI"
+subtitle: "Session III: NLP-Syntactic Parsing and Unsupervised Machine Learning Approaches"
+author: "Haiman Wong"
+date: "2025-01-07"
+format:
+  revealjs:
+    theme: beige
+    incremental: true
+    slide-number: true
+    navigation-mode: linear
+    transition: slide
+    width: 1600
+    height: 1000
+    margin: 0.2
+    embed-resources: true
+    css: styles.css
+execute:
+  enabled: false
+---
+
+## Overview 
+- Findings derived from 2021 NIST RFI Dataset.
+- Techniques explored:
+  1. Lemmatization and Stemming.
+  2. Vectorization.
+  3. Parts of Speech (POS) Tagging.
+  4. Named Entity Recognition (NER).
+  5. LDA Topic Modeling.
+  6. K-Means Clustering.
+---
+
+## Step 1: Installing and Importing Libraries and Packages 
+
+```python
+import pandas as pd
+import numpy as np
+import re
+import nltk
+nltk.download('punkt')
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
+from nltk.stem import PorterStemmer
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.cluster import KMeans
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.decomposition import LatentDirichletAllocation
+```
+---
+
+## Step 2: Import Data
+
+```python
+df1 = pd.read_csv('LATEST_categorized_nist_2021_rfis.csv')
+
+pd.set_option('display.max_rows', None)
+pd.set_option('display.max_columns', None)
+
+display(df1.head())
+```
+
+<!-- Embed image for imported data -->
+![Imported Data](prototype1_images/imported_df1.png){width=80%}
+
+---
+
+## Step 3: Explore Data 
+
+```python
+df1.head(5)
+````
+
+<!-- Embed image for head results -->
+![Head Text Result](prototype1_images/df1_head.png){width=80%}
+
+
+```python
+df1.describe()
+```
+
+<!-- Embed image for describe results -->
+![Describe Text Result](prototype1_images/df1_describe.png){width=80%}
+
+---
+
+## Step 4: Text Cleaning
+
+```python
+import pandas as pd
+import re
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
+import nltk
+
+# Ensure NLTK resources are downloaded
+nltk.download('punkt')
+nltk.download('stopwords')
+
+def cleaned_text(text):
+    if pd.isnull(text):
+        return ''  # Handle NaN values
+    if isinstance(text, str):
+        # Remove line breaks and other extra whitespace characters
+        text = re.sub(r'\s+', ' ', text)
+        # Lowercase the text
+        text = text.lower()
+        # Remove punctuation and special characters
+        text = re.sub(r'[^\w\s]', '', text)
+        # Remove numbers
+        text = re.sub(r'\d', '', text)
+        # Tokenize the text
+        tokens = word_tokenize(text)
+        # Remove stopwords
+        stopwords_set = set(stopwords.words('english'))
+        filtered_tokens = [word for word in tokens if word not in stopwords_set]
+        return ' '.join(filtered_tokens)
+    else:
+        return ''  # Return empty string for non-string values
+
+# Assuming df1 is already loaded with your data
+df1['cleaned_text'] = df1['Text'].apply(cleaned_text)
+print(df1[['Text', 'cleaned_text']].head())  # Print original and cleaned text to compare
+```
+
+<!-- Embed image for text cleaning -->
+![Text Cleaning Results](prototype1_images/cleaned_df1.png){width=80%}
+
+---
+
+## Technique 1: Lemmatization and Stemming
+
+```python
+from nltk.stem import WordNetLemmatizer
+from nltk.stem import PorterStemmer
+
+# Initialize lemmatizer and stemmer
+lemmatizer = WordNetLemmatizer()
+stemmer = PorterStemmer()
+
+def lemmatize_text(text):
+    # Tokenize the text
+    tokens = word_tokenize(text)
+    # Lemmatize the tokens
+    lemmatized_tokens = [lemmatizer.lemmatize(word) for word in tokens]
+    return ' '.join(lemmatized_tokens)
+
+def stem_text(text):
+    # Tokenize the text
+    tokens = word_tokenize(text)
+    # Stem the tokens
+    stemmed_tokens = [stemmer.stem(word) for word in tokens]
+    return ' '.join(stemmed_tokens)
+
+# Apply lemmatization and stemming to your existing 'cleaned_text' column
+df1['lemmatized_text'] = df1['cleaned_text'].apply(lemmatize_text)
+df1['stemmed_text'] = df1['cleaned_text'].apply(stem_text)
+```
+---
+
+## Technique 1 Results
+
+```python
+print(df1['lemmatized_text'][7])
+```
+
+<!-- Embed image for lemmatization results -->
+![Lemmatized Text Result](prototype1_images/lemmatized_result.png){width=80%}
+
+
+```python
+print(df1['stemmed_text'][7])
+```
+
+<!-- Embed image for stemming results -->
+![Stemmed Text Result](prototype1_images/stemmed_result.png){width=80%}
+
+---
+
+## Technique 2: Vectorization
+
+```python
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+# Initialize the TF-IDF vectorizer
+tfidf_vectorizer = TfidfVectorizer(max_features=1000)  # You can adjust the number of features
+
+# Fit and transform your lemmatized text data
+tfidf_matrix = tfidf_vectorizer.fit_transform(df1['lemmatized_text'])
+
+# Convert the TF-IDF matrix into a DataFrame
+tfidf_df1 = pd.DataFrame(tfidf_matrix.toarray(), columns=tfidf_vectorizer.get_feature_names_out())
+
+#Display the TF-IDF Matrix
+tfidf_df1.head(10)
+```
+
+<!-- Embed image for vectorization results -->
+![Vectorization Results](prototype1_images/vectorization_result.png){width=80%}
+
+---
+
+## Technique 3: Parts of Speech (POS) Tagging
+
+```python
+# Download the NLTK POS tagger data (if not already downloaded)
+nltk.download('averaged_perceptron_tagger')
+
+# Define a function to perform POS tagging on a text
+def pos_tag_text(text):
+    # Tokenize the text
+    tokens = nltk.word_tokenize(text)
+    # Perform POS tagging
+    pos_tags = nltk.pos_tag(tokens)
+    return pos_tags
+
+# Apply POS tagging to your lemmatized text column
+df1['pos_tags'] = df1['lemmatized_text'].apply(pos_tag_text)
+
+# Example of POS Tagging Results
+print(df1['pos_tags'][7])
+````
+
+<!-- Embed image for pos results -->
+![POS Results](prototype1_images/pos_results.png){width=80%}
+
+---
+
+## Technique 4: Named Entity Recognition (NER)
+
+```python
+import pandas as pd
+
+# Load the spaCy model
+import spacy
+nlp = spacy.load('en_core_web_sm')
+
+# Increase the maximum length of text that the model can handle
+nlp.max_length = 10000000
+
+# Function to extract named entities
+def extract_named_entities(text):
+    doc = nlp(text)
+    return [(ent.text, ent.label_) for ent in doc.ents]
+
+# Assuming 'df1' has a column 'Text' that contains the text to analyze
+df1['named_entities'] = df1['Text'].apply(extract_named_entities)
+
+# Expanding the named_entities lists into a DataFrame
+rows = []
+for index, row in df1.iterrows():
+    for entity in row['named_entities']:
+        rows.append((row['Filename'], row['Organization'], row['Date'], row['Text'], entity[0], entity[1]))
+
+# Create a new DataFrame
+entities_df = pd.DataFrame(rows, columns=['Filename', 'Organization', 'Date', 'Text', 'Entity', 'Type'])
+
+# Example of NER Results
+display(entities_df.head(15))
+```
+
+<!-- Embed image for ner results -->
+![NER Results](prototype1_images/ner_results.png){width=80%}
+
+---
+
+## Technique 5: LDA Topic Modeling - Entire NIST 2021 Dataset 
+
+```python
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.decomposition import LatentDirichletAllocation
+import matplotlib.pyplot as plt
+import pandas as pd
+
+# Define custom stopwords
+custom_stop_words = [
+    'et', 'al', 'â', 'j', 'pp', '10', 'with', 'are', 'that', 'this',
+    'should', 'will', 'may', 'not', 'can', 'from', 'have', 'each', 
+    'use', 'more', 'these', 'other', 'was', 'they', 'you', 'how', 'what', 
+    'which', 'its', 'their', 'august', 'york', 'could', 'our', 'there', 'however',
+    'such','all', 'with', 'but', 'like', 'thursday', 'forthcoming', 'ours', 'yes', 'black', 'cleveland',
+    'pendingpost', 'tabassi', 'any', 'has', 'comment', 'submission', 'see', 'submitter', 'doc', 'nist', 'must', 'also',
+    'include', 'includes', 'dierences', 'imagepng', 'tony', 'pamela', 'jeroen', 'systems', 'models'
+]
+
+# Function for LDA topic modeling with topic names
+def lda_topic_modeling_with_names(df, text_column, n_topics=10, max_df=0.95, min_df=2):
+    # Drop NaN values in the text column
+    df = df.dropna(subset=[text_column])
+
+    # Create a CountVectorizer
+    vectorizer = CountVectorizer(max_df=max_df, min_df=min_df, stop_words=custom_stop_words)
+
+    # Fit and transform the text data
+    tf = vectorizer.fit_transform(df[text_column])
+
+    # Create the LDA model
+    lda = LatentDirichletAllocation(n_components=n_topics, random_state=42, max_iter=20, learning_decay=0.7)
+
+    # Fit the model
+    lda.fit(tf)
+
+    # Get document-topic matrix
+    document_topic_matrix = lda.transform(tf)
+
+    # Calculate the number of documents per topic
+    topic_document_counts = document_topic_matrix.sum(axis=0)
+
+    # Create a list of topics sorted by document counts
+    sorted_topics = sorted(range(len(topic_document_counts)), key=lambda i: -topic_document_counts[i])
+
+    # Generate topic names based on top words
+    print("\nTopics Sorted by Document Counts:")
+    topic_names = []
+    for i, topic_index in enumerate(sorted_topics):
+        words = [vectorizer.get_feature_names_out()[index] for index in lda.components_[topic_index].argsort()[-10:]]
+        print(f"Topic {i}:")
+        print(words)
+        print(f"Number of Documents: {topic_document_counts[topic_index]:.2f}\n")
+        topic_label = " ".join(words[-2:])  # Last 2 significant words
+        topic_names.append(topic_label)
+```
+
+
+<!-- Embed image for lda results -->
+![LDA Results](prototype1_images/lda_entire.png){width=80%}`
+
+---
+
+## Technique 5 Continued: Visualizing LDA Topic Modeling Results - Entire NIST 2021 Dataset 
+```python
+plt.figure(figsize=(12, 8))
+    plt.barh([topic_names[i] for i in sorted_topics],
+             [topic_document_counts[i] for i in sorted_topics],
+             color='skyblue')
+    plt.xlabel("Document Counts")
+    plt.ylabel("Topics")
+    plt.title("Document Counts per Topic")
+    plt.tight_layout()
+    plt.gca().invert_yaxis()
+    plt.show()
+```
+
+
+<!-- Embed image for lda plot -->
+![LDA Plot](prototype1_images/lda_entireplot.png){width=80%}
+
+---
+
+## Technique 5 Continued: LDA Topic Modeling - Industry Associations
+```python
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.decomposition import LatentDirichletAllocation
+import matplotlib.pyplot as plt
+import pandas as pd
+
+# Define custom stopwords
+custom_stop_words = [
+    'et', 'al', 'â', 'j', 'pp', '10', 'with', 'are', 'that', 'this',
+    'should', 'will', 'may', 'not', 'can', 'from', 'have', 'each', 
+    'use', 'more', 'these', 'other', 'was', 'they', 'you', 'how', 'what', 
+    'which', 'its', 'their', 'august', 'york', 'could', 'our', 'there', 'however',
+    'such','all', 'with', 'but', 'like', 'thursday', 'forthcoming', 'ours', 'yes', 
+    'black', 'cleveland', 'pendingpost', 'tabassi', 'any', 'has', 'comment', 
+    'submission', 'see', 'submitter', 'doc', 'nist', 'must', 'also', 'include', 
+    'includes', 'dierences', 'imagepng', 'tony', 'pamela', 'jeroen', 'systems', 
+    'models', 'an', 'or', 'as', 'be', 'is', 'in', 'www', 'by', 'we', '0001', 
+    '0009', 'sp', 'set', 'it', '800', 'https', 'at', 'would', 'if', 'org', '226', 
+    '19', 'gov', 'your', 'arxiv', '11', '24', 'pm', 'com', 'risks', 'note', 'november',
+    'on', 'to', '18', 'thorough', 'pages', 'suggested', 'undertaking', 'interested', 
+    'acknowledging','rfi', '2021', 'based', 'professional', 'national'
+]
+
+# Function for LDA topic modeling with auto-generated topic labels
+def lda_topic_modeling_with_names(df, text_column, n_topics=5, max_df=0.95, min_df=2):
+    # Drop NaN values in the text column
+    df = df.dropna(subset=[text_column])
+
+    # Create a CountVectorizer
+    vectorizer = CountVectorizer(max_df=max_df, min_df=min_df, stop_words=custom_stop_words)
+
+    # Fit and transform the text data
+    tf = vectorizer.fit_transform(df[text_column])
+
+
+    # Create the LDA model
+    lda = LatentDirichletAllocation(n_components=n_topics, random_state=42, max_iter=20, learning_decay=0.7)
+
+    # Fit the model
+    lda.fit(tf)
+
+    # Get document-topic matrix
+    document_topic_matrix = lda.transform(tf)
+
+    # Calculate the number of documents per topic
+    topic_document_counts = document_topic_matrix.sum(axis=0)
+
+    # Create a list of topics sorted by document counts (descending order)
+    sorted_topics = sorted(range(len(topic_document_counts)), key=lambda i: -topic_document_counts[i])
+
+    # Generate topic names based on top words
+    print("\nTopics Sorted by Document Counts:")
+    topic_names = []
+    sorted_counts = []
+    for i, topic_index in enumerate(sorted_topics):
+        words = [vectorizer.get_feature_names_out()[index] for index in lda.components_[topic_index].argsort()[-10:]]
+        print(f"Topic {i}:")
+        print(words)
+        print(f"Number of Documents: {topic_document_counts[topic_index]:.2f}\n")
+        topic_label = " ".join(words[-2:])  # Last 2 significant words
+        topic_names.append(topic_label)
+        sorted_counts.append(topic_document_counts[topic_index])
+```
+
+
+<!-- Embed image for lda results -->
+![LDA Results](prototype1_images/lda_industry.png){width=80%}`
+
+---
+
+## Technique 5 Continued: Visualizing LDA Topic Modeling Results - Industry Associations
+```python
+plt.figure(figsize=(12, 8))
+    plt.barh(topic_names, sorted_counts, color='skyblue')
+    plt.xlabel("Document Counts")
+    plt.ylabel("Topics")
+    plt.title("Document Counts per Topic (Sorted by Count)")
+    plt.tight_layout()
+    plt.gca().invert_yaxis()
+    plt.show()
+```
+
+
+<!-- Embed image for lda plot -->
+![LDA Plot](prototype1_images/lda_industryplot.png){width=80%}
+
+---
+
+## Technique 5 Continued: LDA Topic Modeling - Independent Submissions 
+```python
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.decomposition import LatentDirichletAllocation
+import matplotlib.pyplot as plt
+import pandas as pd
+
+# Define custom stopwords
+custom_stop_words = [
+    'et', 'al', 'â', 'j', 'pp', '10', 'with', 'are', 'that', 'this',
+    'should', 'will', 'may', 'not', 'can', 'from', 'have', 'each', 
+    'use', 'more', 'these', 'other', 'was', 'they', 'you', 'how', 'what', 
+    'which', 'its', 'their', 'august', 'york', 'could', 'our', 'there', 'however',
+    'such','all', 'with', 'but', 'like', 'thursday', 'forthcoming', 'ours', 'yes', 
+    'black', 'cleveland', 'pendingpost', 'tabassi', 'any', 'has', 'comment', 
+    'submission', 'see', 'submitter', 'doc', 'nist', 'must', 'also', 'include', 
+    'includes', 'dierences', 'imagepng', 'tony', 'pamela', 'jeroen', 'systems', 
+    'models', 'an', 'or', 'as', 'be', 'is', 'in', 'www', 'by', 'we', '0001', 
+    '0009', 'sp', 'set', 'it', '800', 'https', 'at', 'would', 'if', 'org', '226', 
+    '19', 'gov', 'your', 'arxiv', '11', '24', 'pm', 'com', 'risks', 'note', 'november', 'for','and'
+]
+
+# Function for LDA topic modeling with auto-generated topic labels
+def lda_topic_modeling_with_names(df, text_column, n_topics=7, max_df=0.95, min_df=2):
+    # Drop NaN values in the text column
+    df = df.dropna(subset=[text_column])
+
+    # Create a CountVectorizer
+    vectorizer = CountVectorizer(max_df=max_df, min_df=min_df, stop_words=custom_stop_words)
+
+    # Fit and transform the text data
+    tf = vectorizer.fit_transform(df[text_column])
+
+    # Create the LDA model
+    lda = LatentDirichletAllocation(n_components=n_topics, random_state=42, max_iter=20, learning_decay=0.7)
+
+    # Fit the model
+    lda.fit(tf)
+
+    # Get document-topic matrix
+    document_topic_matrix = lda.transform(tf)
+
+    # Calculate the number of documents per topic
+    topic_document_counts = document_topic_matrix.sum(axis=0)
+
+    # Create a list of topics sorted by document counts (descending order)
+    sorted_topics = sorted(range(len(topic_document_counts)), key=lambda i: -topic_document_counts[i])
+
+    # Generate topic names based on top words
+    print("\nTopics Sorted by Document Counts:")
+    topic_names = []
+    sorted_counts = []
+    for i, topic_index in enumerate(sorted_topics):
+        words = [vectorizer.get_feature_names_out()[index] for index in lda.components_[topic_index].argsort()[-10:]]
+        print(f"Topic {i}:")
+        print(words)
+        print(f"Number of Documents: {topic_document_counts[topic_index]:.2f}\n")
+        topic_label = " ".join(words[-2:])  # Last 2 significant words
+        topic_names.append(topic_label)
+        sorted_counts.append(topic_document_counts[topic_index])
+```
+
+
+<!-- Embed image for lda results -->
+![LDA Results](prototype1_images/lda_independents.png){width=80%}
+
+---
+
+## Technique 5 Continued: Visualizing LDA Topic Modeling Results - Independent Submissions  
+```python
+plt.figure(figsize=(12, 8))
+    plt.barh(topic_names, sorted_counts, color='skyblue')
+    plt.xlabel("Document Counts")
+    plt.ylabel("Topics")
+    plt.title("Document Counts per Topic (Sorted by Count)")
+    plt.tight_layout()
+    plt.gca().invert_yaxis()
+    plt.show()
+```
+
+<!-- Embed image for lda results -->
+![LDA Results](prototype1_images/lda_independentsplot.png){width=80%}
+
+---
+
+## Technique 5 Continued: LDA Topic Modeling - Advocacy and Non-Profit Organizations
+```python
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.decomposition import LatentDirichletAllocation
+import matplotlib.pyplot as plt
+import pandas as pd
+
+# Define custom stopwords
+custom_stop_words = [
+    'et', 'al', 'â', 'j', 'pp', '10', 'with', 'are', 'that', 'this',
+    'should', 'will', 'may', 'not', 'can', 'from', 'have', 'each', 
+    'use', 'more', 'these', 'other', 'was', 'they', 'you', 'how', 'what', 
+    'which', 'its', 'their', 'august', 'york', 'could', 'our', 'there', 'however',
+    'such','all', 'with', 'but', 'like', 'thursday', 'forthcoming', 'ours', 'yes', 
+    'black', 'cleveland', 'pendingpost', 'tabassi', 'any', 'has', 'comment', 
+    'submission', 'see', 'submitter', 'doc', 'nist', 'must', 'also', 'include', 
+    'includes', 'dierences', 'imagepng', 'tony', 'pamela', 'jeroen', 'systems', 
+    'models', 'an', 'or', 'as', 'be', 'is', 'in', 'www', 'by', 'we', '0001', 
+    '0009', 'sp', 'set', 'it', '800', 'https', 'at', 'would', 'if', 'org', '226', 
+    '19', 'gov', 'your', 'arxiv', '11', '24', 'pm', 'com', 'risks', 'note', 'november', 
+    'pdf', 'comments', '20899', '100', 'gaithersburg', 'bureau', 'natural', 'publicly',
+    'thank', 'piece', 'request', 'response', 'need', 'sep', 'submission', 'ensure', 
+    '2020', 'commission', 'new', 'about', 'actors', 'where', '2019', '210726', 
+    '0151', '2018', 'oecd', 'approach', 'based', 'when', 'those', 'lee', 'md',
+    'ms', 'dear', 'important', 'including', 'across', 'do', 'recommend', 'related', 
+    'little', 'rfi', 'unlikely', 'continuous', 'stakes', 'want', 'already', 'low',
+    'tool', 'stop', 'changing', 'rfi', '2017', 'being', 'soft', 'via', '60', 'ca', 
+    'year', 'truly', 'electronic', 'year', 'reference', 'wants', '21', 'general', 
+    'threshold', 'seems', 'left', 'red', 'intended', '13', 'docket', 'into', 'best',
+    '18', '13'
+]
+
+# Function for LDA topic modeling with auto-generated topic labels
+def lda_topic_modeling_with_names(df, text_column, n_topics=7, max_df=0.95, min_df=2):
+    # Drop NaN values in the text column
+    df = df.dropna(subset=[text_column])
+
+    # Create a CountVectorizer
+    vectorizer = CountVectorizer(max_df=max_df, min_df=min_df, stop_words=custom_stop_words)
+
+    # Fit and transform the text data
+    tf = vectorizer.fit_transform(df[text_column])
+
+    # Create the LDA model
+    lda = LatentDirichletAllocation(n_components=n_topics, random_state=42, max_iter=20, learning_decay=0.7)
+
+    # Fit the model
+    lda.fit(tf)
+
+    # Get document-topic matrix
+    document_topic_matrix = lda.transform(tf)
+
+    # Calculate the number of documents per topic
+    topic_document_counts = document_topic_matrix.sum(axis=0)
+
+    # Create a list of topics sorted by document counts (descending order)
+    sorted_topics = sorted(range(len(topic_document_counts)), key=lambda i: -topic_document_counts[i])
+
+    # Generate topic names based on top words
+    print("\nTopics Sorted by Document Counts:")
+    topic_names = []
+    sorted_counts = []
+    for i, topic_index in enumerate(sorted_topics):
+        words = [vectorizer.get_feature_names_out()[index] for index in lda.components_[topic_index].argsort()[-10:]]
+        print(f"Topic {i}:")
+        print(words)
+        print(f"Number of Documents: {topic_document_counts[topic_index]:.2f}\n")
+        topic_label = " ".join(words[-2:])  # Last 2 significant words
+        topic_names.append(topic_label)
+        sorted_counts.append(topic_document_counts[topic_index])
+```
+
+<!-- Embed image for lda results -->
+![LDA Results](prototype1_images/lda_advocacy.png){width=80%}
+
+---
+
+## Visualizing LDA Topic Modeling Results - Advocacy and Non-Profit Organizations
+```python
+  plt.figure(figsize=(10, 6))
+    plt.barh(topic_names, sorted_counts, color='skyblue')
+    plt.xlabel("Document Counts")
+    plt.ylabel("Topics")
+    plt.title("Document Counts per Topic (Sorted by Count)")
+    plt.tight_layout()
+    plt.gca().invert_yaxis()
+    plt.show()
+```
+
+<!-- Embed image for lda results -->
+![LDA Results](prototype1_images/lda_advocacyplot.png){width=80%}
+
+---
+
+## Technique 6: K-Means Clustering: Entire NIST 2021 Dataset 
+```python
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
+import matplotlib.pyplot as plt
+import pandas as pd
+
+# Define custom stopwords
+custom_stop_words = [
+    'et', 'al', 'â', 'j', 'pp', '10', 'with', 'are', 'that', 'this',
+    'should', 'will', 'may', 'not', 'can', 'from', 'have', 'each', 
+    'use', 'more', 'these', 'other', 'was', 'they', 'you', 'how', 'what', 
+    'which', 'its', 'their', 'august', 'york', 'could', 'our', 'there', 'however',
+    'such','all', 'with', 'but', 'like', 'thursday', 'forthcoming', 'ours', 'yes', 
+    'black', 'cleveland', 'pendingpost', 'tabassi', 'any', 'has', 'comment', 
+    'submission', 'see', 'submitter', 'doc', 'nist', 'must', 'also', 'include', 
+    'includes', 'dierences', 'imagepng', 'tony', 'pamela', 'jeroen', 'systems', 
+    'models', 'an', 'or', 'as', 'be', 'is', 'in', 'www', 'by', 'we', '0001', 
+    '0009', 'sp', 'set', 'it', '800', 'https', 'at', 'would', 'if', 'org', '226', 
+    '19', 'gov', 'your', 'arxiv', '11', '24', 'pm', 'com', 'risks', 'note', 'november', 
+    'the', 'and', 'for', 'did', 'type', 'attachment', 'date', 'risk', 'framework', 'attached',
+    'management', 'comments', 'pdf', 'new', 'status', 'please', 'response', 'web'
+]
+
+# K-Means Clustering Function
+def kmeans_clustering_with_visualization(df, text_column, n_clusters=5, max_features=2000):
+    # Drop NaN values
+    df = df.dropna(subset=[text_column])
+
+    # TF-IDF Vectorization
+    vectorizer = TfidfVectorizer(max_features=max_features, stop_words=custom_stop_words)
+    tfidf_matrix = vectorizer.fit_transform(df[text_column])
+
+    # K-Means Clustering
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+    kmeans.fit(tfidf_matrix)
+
+    # Assign clusters to documents
+    df['Cluster'] = kmeans.labels_
+
+    # Extract top terms per cluster and generate cluster names
+    print("Top terms per cluster:")
+    order_centroids = kmeans.cluster_centers_.argsort()[:, ::-1]
+    terms = vectorizer.get_feature_names_out()
+    cluster_names = []
+    for i in range(n_clusters):
+        top_terms = [terms[ind] for ind in order_centroids[i, :5]]  # Top 5 terms
+        cluster_label = " ".join(top_terms[:2])  # Use the top 2 terms for naming
+        cluster_names.append(cluster_label)
+        print(f"Cluster {i} ({cluster_label}): ", end="")
+        print(", ".join(top_terms))
+
+    # Dimensionality Reduction for Visualization
+    pca = PCA(n_components=2)
+    reduced_data = pca.fit_transform(tfidf_matrix.toarray())
+
+ plt.figure(figsize=(8, 5))  # Reduced size for easier screenshotting
+    for i in range(n_clusters):
+        cluster_data = reduced_data[df['Cluster'] == i]
+        plt.scatter(cluster_data[:, 0], cluster_data[:, 1], label=f'Cluster {i} ({cluster_names[i]})')
+
+    plt.title('K-Means Clustering Results (df1)')
+    plt.xlabel('PCA Component 1')
+    plt.ylabel('PCA Component 2')
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+    return df
+
+clustered_df1 = kmeans_clustering_with_visualization(df1, 'Text', n_clusters=5)
+```
+
+<!-- Embed image for lda results -->
+![LDA Results](prototype1_images/kmeans_entire.png){width=80%}
+
+---
+
+## Technique 6: K-Means Clustering - Industry Associations
+```python
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
+import matplotlib.pyplot as plt
+import pandas as pd
+
+# Define custom stopwords
+custom_stop_words = [
+    'et', 'al', 'â', 'j', 'pp', '10', 'with', 'are', 'that', 'this',
+    'should', 'will', 'may', 'not', 'can', 'from', 'have', 'each', 
+    'use', 'more', 'these', 'other', 'was', 'they', 'you', 'how', 'what', 
+    'which', 'its', 'their', 'august', 'york', 'could', 'our', 'there', 'however',
+    'such','all', 'with', 'but', 'like', 'thursday', 'forthcoming', 'ours', 'yes', 
+    'black', 'cleveland', 'pendingpost', 'tabassi', 'any', 'has', 'comment', 
+    'submission', 'see', 'submitter', 'doc', 'nist', 'must', 'also', 'include', 
+    'includes', 'dierences', 'imagepng', 'tony', 'pamela', 'jeroen', 'systems', 
+    'models', 'an', 'or', 'as', 'be', 'is', 'in', 'www', 'by', 'we', '0001', 
+    '0009', 'sp', 'set', 'it', '800', 'https', 'at', 'would', 'if', 'org', '226', 
+    '19', 'gov', 'your', 'arxiv', '11', '24', 'pm', 'com', 'risks', 'note', 'november', 
+    'the', 'and', 'for', 'did', 'type', 'fair', 'professional', 'credentialed', 'nspe', 
+    'individuals', 'materials', 'individual', 'cir', 'lei', 'sound', 'engineers'
+]
+
+# K-Means Clustering Function for a Subset with Auto-Generated Cluster Names
+def kmeans_clustering_for_category(df, category_column, target_category, text_column, n_clusters=5, max_features=2000):
+    # Filter the dataframe for the specified category
+    filtered_df = df[df[category_column] == target_category]
+    
+    if filtered_df.empty:
+        print(f"No data found for category: {target_category}")
+        return
+    
+    # Drop NaN values in the text column
+    filtered_df = filtered_df.dropna(subset=[text_column])
+
+
+    # TF-IDF Vectorization
+    vectorizer = TfidfVectorizer(max_features=max_features, stop_words=custom_stop_words)
+    tfidf_matrix = vectorizer.fit_transform(filtered_df[text_column])
+
+    # K-Means Clustering
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+    kmeans.fit(tfidf_matrix)
+
+    # Assign clusters to documents
+    filtered_df['Cluster'] = kmeans.labels_
+
+    # Extract top terms per cluster and generate cluster names
+    print(f"Top terms per cluster for category '{target_category}':")
+    order_centroids = kmeans.cluster_centers_.argsort()[:, ::-1]
+    terms = vectorizer.get_feature_names_out()
+    cluster_names = []
+    for i in range(n_clusters):
+        top_terms = [terms[ind] for ind in order_centroids[i, :10]]
+        cluster_label = f"{top_terms[0]} {top_terms[1]}"  # Combine the top two terms for the cluster name
+        cluster_names.append(cluster_label)
+        print(f"Cluster {i} ({cluster_label}): {', '.join(top_terms)}")
+
+    # Map cluster names to the DataFrame
+    filtered_df['Cluster_Name'] = filtered_df['Cluster'].map(lambda x: cluster_names[x])
+
+    # Dimensionality Reduction for Visualization
+    pca = PCA(n_components=2)
+    reduced_data = pca.fit_transform(tfidf_matrix.toarray())
+
+ plt.figure(figsize=(10, 6))
+    for i in range(n_clusters):
+        cluster_data = reduced_data[filtered_df['Cluster'] == i]
+        plt.scatter(cluster_data[:, 0], cluster_data[:, 1], label=cluster_names[i])
+
+    plt.title(f'K-Means Clustering Results for {target_category}')
+    plt.xlabel('PCA Component 1')
+    plt.ylabel('PCA Component 2')
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+    return filtered_df
+
+clustered_subset_df = kmeans_clustering_for_category(df1, 'Category', 'industry_associations', 'Text', n_clusters=5)
+```
+
+<!-- Embed image for lda results -->
+![LDA Results](prototype1_images/kmeans_industry.png){width=80%}
+
+---
+
+## Technique 6: K-Means Clustering - Independent Submissions
+```python
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
+import matplotlib.pyplot as plt
+import pandas as pd
+
+# Define custom stopwords
+custom_stop_words = [
+    'et', 'al', 'â', 'j', 'pp', '10', 'with', 'are', 'that', 'this', 'should', 'will', 'may', 'not', 'can', 'from', 'have', 'each', 
+    'use', 'more', 'these', 'other', 'was', 'they', 'you', 'how', 'what', 'which', 'its', 'their', 'august', 'york', 'could', 'our', 
+    'there', 'however','such','all', 'with', 'but', 'like', 'thursday', 'forthcoming', 'ours', 'yes', 'black', 'cleveland', 'pendingpost', 
+    'tabassi', 'any', 'has', 'comment', 'submission', 'see', 'submitter', 'doc', 'nist', 'must', 'also', 'include', 'includes', 'dierences', 
+    'imagepng', 'tony', 'pamela', 'jeroen', 'systems', 'models', 'an', 'or', 'as', 'be', 'is', 'in', 'www', 'by', 'we', '0001', '0009', 'sp', 
+    'set', 'it', '800', 'https', 'at', 'would', 'if', 'org', '226', '19', 'gov', 'your', 'arxiv', '11', '24', 'pm', 'com', 'risks', 'note', 'november', 
+    'the', 'and', 'for', 'did', 'type','mayo', 'dennis', 'farahnaaz', 'who', 'staa', 'least','ctec', 'docket', 'web', 'ksizprx', 'phd', 'end', 'optin', 
+    'physical', 'wanted', 'khakoo', 'setting', 'reach', 'comes', 'june', 'feel', 'irritating', 'senior', 'seeing', 'equivalent', 'hello', 'passed', 'pdf',
+    'comments', 'lpqd', 'vertical', 'center', 'rfi', 'comments','best', 'attached', 'topic', 'already', 'dear', 'erik', 'deumens', 'deumensufl', 'franse', 
+    'assurance','dierent', 'cset', 'georgetown', 'recommend', 'dierentially', 'carnegie', 'director', 'postprocessing', 'inversion','mellon', 'including', 
+    'both', 'edu', 'elsi,' 'example', 'realistic', 'risk', 'framework', 'florida', 'system', 'different','management', 'university', 'idsa', 'editorial', 
+    'against', 'supporting', 'call', 'practices', 'regarding', 'reference', 'date','material', 'documents', 'response', 'email', 'subject', 'submit', 
+    'evaluating', 'evaulated', 'event', 'characteristics', 'zick', 'nonai','general', 'essential', 'establishing', 'establishes', 'european', 'evaluates', 
+    'example', 'evaluate', 'evaluated', 'evans', 'evaluation','evaluator', 'random', 'exists', 'expected', 'expect', 'expectation', 'usenix', 'evaluationand', 
+    'events', 'even', 'evaluators', 'class','establish', 'etc', 'etchemendy', 'evaluations', 'lock', 'zicari', 'enumeration', 'entities', 'entire', 'examples', 
+    'exact', 'door','exactly', 'evolving', 'evolves', 'everyone', 'expanded', 'existing', 'every', 'experiences', 'experience', 'ethayarajh', 'factor', 'experts',
+    'factors', 'esposito', 'explain', 'erode', 'especially', 'error', 'expert', 'explanations', 'explicit', 'exploit', 'expressed', 'enough', 'ensure', 'ensuring', 
+    'erm', 'into', 'john', 'city', 'focused', 'officer', 'participate', 'safe', 'new', 'fig', 'please', 'provide','use', 'used', 'inherently', 'under', 'while', 
+    'control', 'important', 'easy', 'version', 'find', 'additional', 'conducted', 'big', 'very', 'about','areas', 'president', 'game', 'rate', 'incorporate', 'within'
+]
+
+# K-Means Clustering Function for a Subset with Auto-Generated Cluster Names
+def kmeans_clustering_for_category(df, category_column, target_category, text_column, n_clusters=5, max_features=2000):
+    # Filter the dataframe for the specified category
+    filtered_df = df[df[category_column] == target_category]
+    
+    if filtered_df.empty:
+        print(f"No data found for category: {target_category}")
+        return
+    
+    # Drop NaN values in the text column
+    filtered_df = filtered_df.dropna(subset=[text_column])
+
+    # TF-IDF Vectorization
+    vectorizer = TfidfVectorizer(max_features=max_features, stop_words=custom_stop_words)
+    tfidf_matrix = vectorizer.fit_transform(filtered_df[text_column])
+
+    # K-Means Clustering
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+    kmeans.fit(tfidf_matrix)
+
+    # Assign clusters to documents
+    filtered_df['Cluster'] = kmeans.labels_
+
+     # Extract top terms per cluster and generate cluster names
+    print(f"Top terms per cluster for category '{target_category}':")
+    order_centroids = kmeans.cluster_centers_.argsort()[:, ::-1]
+    terms = vectorizer.get_feature_names_out()
+    cluster_names = []
+    for i in range(n_clusters):
+        top_terms = [terms[ind] for ind in order_centroids[i, :10]]
+        cluster_label = f"{top_terms[0]} {top_terms[1]}"  # Combine the top two terms for the cluster name
+        cluster_names.append(cluster_label)
+        print(f"Cluster {i} ({cluster_label}): {', '.join(top_terms)}")
+
+    # Map cluster names to the DataFrame
+    filtered_df['Cluster_Name'] = filtered_df['Cluster'].map(lambda x: cluster_names[x])
+
+    # Dimensionality Reduction for Visualization
+    pca = PCA(n_components=2)
+    reduced_data = pca.fit_transform(tfidf_matrix.toarray())
+
+    plt.figure(figsize=(10, 6))
+    for i in range(n_clusters):
+        cluster_data = reduced_data[filtered_df['Cluster'] == i]
+        plt.scatter(cluster_data[:, 0], cluster_data[:, 1], label=cluster_names[i])
+
+    plt.title(f'K-Means Clustering Results for {target_category}')
+    plt.xlabel('PCA Component 1')
+    plt.ylabel('PCA Component 2')
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+    return filtered_df
+
+clustered_subset_df = kmeans_clustering_for_category(df1, 'Category', 'independent', 'Text', n_clusters=5)
+```
+
+
+<!-- Embed image for lda results -->
+![LDA Results](prototype1_images/kmeans_independent.png){width=80%}
+
+---
+
+## Technique 6: K-Means Clustering - Advocacy and Non-Profit Organizations
+```python
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
+import matplotlib.pyplot as plt
+import pandas as pd
+
+# Define custom stopwords
+custom_stop_words = [
+    'et', 'al', 'â', 'j', 'pp', '10', 'with', 'are', 'that', 'this',
+    'should', 'will', 'may', 'not', 'can', 'from', 'have', 'each', 
+    'use', 'more', 'these', 'other', 'was', 'they', 'you', 'how', 'what', 
+    'which', 'its', 'their', 'august', 'york', 'could', 'our', 'there', 'however',
+    'such','all', 'with', 'but', 'like', 'thursday', 'forthcoming', 'ours', 'yes', 
+    'black', 'cleveland', 'pendingpost', 'tabassi', 'any', 'has', 'comment', 
+    'submission', 'see', 'submitter', 'doc', 'nist', 'must', 'also', 'include', 
+    'includes', 'dierences', 'imagepng', 'tony', 'pamela', 'jeroen', 'systems', 
+    'models', 'an', 'or', 'as', 'be', 'is', 'in', 'www', 'by', 'we', '0001', 
+    '0009', 'sp', 'set', 'it', '800', 'https', 'at', 'would', 'if', 'org', '226', 
+    '19', 'gov', 'your', 'arxiv', '11', '24', 'pm', 'com', 'risks', 'note', 'november', 
+    'the', 'and', 'for', 'did', 'type', 'shotspotter', 'epic', 'oecd', 'forhumanity', 'atlas',
+    'new', 'ssos', 'comments', 'ugai', 'space', 'sep', 'ssos', 'frand', 'framework', 'police', 'risk'
+]
+
+# K-Means Clustering Function for a Subset with Auto-Generated Cluster Names
+def kmeans_clustering_for_category(df, category_column, target_category, text_column, n_clusters=5, max_features=2000):
+    # Filter the dataframe for the specified category
+    filtered_df = df[df[category_column] == target_category]
+
+    if filtered_df.empty:
+        print(f"No data found for category: {target_category}")
+        return
+    
+    # Drop NaN values in the text column
+    filtered_df = filtered_df.dropna(subset=[text_column])
+
+    # TF-IDF Vectorization
+    vectorizer = TfidfVectorizer(max_features=max_features, stop_words=custom_stop_words)
+    tfidf_matrix = vectorizer.fit_transform(filtered_df[text_column])
+
+    # K-Means Clustering
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+    kmeans.fit(tfidf_matrix)
+
+    # Assign clusters to documents
+    filtered_df['Cluster'] = kmeans.labels_
+
+    # Extract top terms per cluster and generate cluster names
+    print(f"Top terms per cluster for category '{target_category}':")
+    order_centroids = kmeans.cluster_centers_.argsort()[:, ::-1]
+    terms = vectorizer.get_feature_names_out()
+    cluster_names = []
+    for i in range(n_clusters):
+        top_terms = [terms[ind] for ind in order_centroids[i, :10]]
+        cluster_label = f"{top_terms[0]} {top_terms[1]}"  # Combine the top two terms for the cluster name
+        cluster_names.append(cluster_label)
+        print(f"Cluster {i} ({cluster_label}): {', '.join(top_terms)}")
+
+    # Map cluster names to the DataFrame
+    filtered_df['Cluster_Name'] = filtered_df['Cluster'].map(lambda x: cluster_names[x])
+
+     # Dimensionality Reduction for Visualization
+    pca = PCA(n_components=2)
+    reduced_data = pca.fit_transform(tfidf_matrix.toarray())
+
+ plt.figure(figsize=(10, 6))
+    for i in range(n_clusters):
+        cluster_data = reduced_data[filtered_df['Cluster'] == i]
+        plt.scatter(cluster_data[:, 0], cluster_data[:, 1], label=cluster_names[i])
+
+    plt.title(f'K-Means Clustering Results for {target_category}')
+    plt.xlabel('PCA Component 1')
+    plt.ylabel('PCA Component 2')
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+    return filtered_df
+
+clustered_subset_df = kmeans_clustering_for_category(df1, 'Category', 'advocacy', 'Text', n_clusters=5)
+```
+
+
+<!-- Embed image for lda results -->
+![LDA Results](prototype1_images/kmeans_advocacy.png){width=80%}
+
+---
+# Questions?
+
