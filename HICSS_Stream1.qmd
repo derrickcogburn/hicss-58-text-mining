@@ -12,8 +12,8 @@ library(quanteda)         # For NLP
 library(tidytext)
 ```
 
-
 # Part 1: Gathering and Cleaning Data
+
 ```{r Import Data}
 NISTfiles <- read_csv("data/LATEST_categorized_nist_2021_rfis.csv")
 
